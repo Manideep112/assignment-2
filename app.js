@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
 const app = express();
-app.use(express.json);
+app.use(express.json());
 
 const dbPath = path.join(__dirname, "twitterClone.db");
 
@@ -31,7 +31,7 @@ initializeDBAndServer();
 
 app.post("/register/", async (request, response) => {
   const { username, password, name, gender } = request.body;
-
+  // why i am geting emoty object
   const registerQuery1 = `
     SELECT 
       *
@@ -41,7 +41,7 @@ app.post("/register/", async (request, response) => {
       username = '${username}'`;
 
   const userIsThere = await db.get(registerQuery1);
-
+  //console.log(password, username, name, gender);
   if (userIsThere !== undefined) {
     response.status(400);
     response.send("User already exists");
@@ -242,4 +242,4 @@ app.post("/user/tweets/", middleware, async (request, response) => {
   response.send("Created a Tweet");
 });
 
-export default app;
+module.exports = app;
