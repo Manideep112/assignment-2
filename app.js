@@ -59,7 +59,7 @@ app.post("/register/", async (request, response) => {
 
       await db.run(registerQuery2);
       response.status(200);
-      response.send("User created succesfully");
+      response.send("User created successfully");
     }
   }
 });
@@ -78,14 +78,15 @@ app.post("/login/", async (request, response) => {
   const userIsThere = await db.get(registerQuery1);
 
   if (userIsThere !== undefined) {
-    let passwordMatched = bcrypt.compare(password, userIsThere.password);
+    let passwordMatched = await bcrypt.compare(password, userIsThere.password);
+    console.log(passwordMatched);
     if (passwordMatched) {
       let payload = { username };
       let token = jwt.sign(payload, "manideep");
       response.send({ jwtToken: token });
     } else {
       response.status(400);
-      response.send("Invalid Password");
+      response.send("Invalid password");
     }
   } else {
     response.status(400);
@@ -97,7 +98,7 @@ app.post("/login/", async (request, response) => {
 
 let middleware = (request, response, next) => {
   let token;
-  let tokenFromRequest = request.headers["authentication"];
+  let tokenFromRequest = request.headers["authorization"];
 
   if (tokenFromRequest !== undefined) {
     token = tokenFromRequest.split(" ")[1];
@@ -105,34 +106,45 @@ let middleware = (request, response, next) => {
   if (token !== undefined) {
     jwt.verify(token, "manideep", (error, user) => {
       if (error) {
-        respond.status(401);
-        respond.send("Invalid JWT Token");
+        response.status(401);
+        response.send("Invalid JWT Token");
       } else {
+        request.username = user.username;
         next();
       }
     });
   } else {
-    respond.status(401);
-    respond.send("Invalid JWT Token");
+    response.status(401);
+    response.send("Invalid JWT Token");
   }
 };
 
-app.get("/users/", async (request, response) => {
-  let query = `
-    SELECT 
-      *
-    FROM 
-      user ;`;
-
-  let dbResponse = app.all(query);
-  response.send(dbResponse);
-});
-
 // API 3
 
+const listingObject = (value) => {
+  return {
+    username: value.username,
+    tweet: value.tweet,
+    dateTime: value.date_time,
+  };
+};
+
 app.get("/user/tweets/feed/", middleware, async (request, response) => {
-  let { user } = request.params;
-  let query3 = `
+  const { username } = request;
+  console.log(username);
+
+  let query31 = `
+    SELECT 
+        *
+    FROM 
+        user
+    WHERE 
+      username = '${username}'`;
+
+  const query3Db1 = await db.all(query31);
+  const { user_id } = query3Db1[0];
+  console.log(user_id);
+  let query32 = `
     SELECT 
     user.username,
     tweet.tweet,
@@ -140,46 +152,69 @@ app.get("/user/tweets/feed/", middleware, async (request, response) => {
     FROM 
     (follower INNER JOIN tweet 
     ON follower.following_user_id = tweet.user_id)AS P 
-    INNER JOIN user ON P.following_user_id = user.user_id;
+    INNER JOIN user ON P.following_user_id = user.user_id
     WHERE 
       follower.follower_user_id = ${user_id}
     LIMIT 4`;
-
-  const query3Db = await db.all(query3);
-  response.send(query3Db);
+  const query3Db2 = await db.all(query32);
+  response.send(query3Db2.map((value) => listingObject(value)));
 });
 
 // api 4
+const listingNames = (value) => {
+  return {
+    name: value.name,
+  };
+};
 
 app.get("/user/following/", middleware, async (request, response) => {
-  const { user } = request.params;
-
-  const query4 = `
+  const { username } = request;
+  let query41 = `
     SELECT 
-      user.name
+         *
+    FROM 
+        user
+    WHERE 
+      username = '${username}'`;
+
+  const query4Db1 = await db.all(query41);
+  const { user_id } = query4Db1[0];
+  const query42 = `
+    SELECT 
+       DISTINCT user.name
     FROM 
       follower INNER JOIN user ON 
-      follower.following_user_id = user.user_id;
+      follower.follower_user_id = user.user_id;
     WHERE 
-      follower_user_id = ${user};`;
+      follower_user_id = ${user_id};`;
 
-  const query4Db = await db.all(query4);
-  response.send(query4Db);
+  const query4Db2 = await db.all(query42);
+  response.send(query4Db2.map((value) => listingNames(value)));
 });
 
 // api 5
 
 app.get("/user/followers/", middleware, async (request, response) => {
-  const { user } = request.params;
+  const { username } = request;
+  let query41 = `
+    SELECT 
+         *
+    FROM 
+        user
+    WHERE 
+      username = '${username}'`;
+
+  const query4Db1 = await db.all(query41);
+  const { user_id } = query4Db1[0];
 
   const query5 = `
     SELECT 
-      user.name
+      DISTINCT user.name
     FROM 
       follower INNER JOIN user ON 
-      follower.follower_user_id = user.user_id;
+      follower.following_user_id = user.user_id;
     WHERE 
-      following_user_id = ${user};`;
+      following_user_id = ${user_id};`;
 
   const query5Db = await db.all(query5);
   response.send(query5Db);
